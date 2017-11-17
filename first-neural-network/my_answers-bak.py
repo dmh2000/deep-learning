@@ -17,8 +17,20 @@ class NeuralNetwork(object):
                                        (self.hidden_nodes, self.output_nodes))
         self.lr = learning_rate
         
-        # use sigmoid activation
+        #### TODO: Set self.activation_function to your implemented sigmoid function ####
+        #
+        # Note: in Python, you can define a function with a lambda expression,
+        # as shown below.
         self.activation_function = lambda x : 1.0 / (1.0 + np.exp(-x))  # Replace 0 with your sigmoid calculation.
+        
+        ### If the lambda code above is not something you're familiar with,
+        # You can uncomment out the following three lines and put your 
+        # implementation there instead.
+        #
+        #def sigmoid(x):
+        #    return 0  # Replace 0 with your sigmoid calculation here
+        #self.activation_function = sigmoid
+                    
 
     def train(self, features, targets):
         ''' Train the network on batch of features and targets. 
@@ -51,15 +63,15 @@ class NeuralNetwork(object):
 
         '''
         #### Implement the forward pass here ####
-        X = X.reshape(1,self.weights_input_to_hidden.shape[0])
-        hidden_inputs  = self.weights_input_to_hidden * X.transpose()
-        hidden_inputs = hidden_inputs.sum(axis=0).reshape((hidden_inputs.shape[1],1))
-        hidden_outputs = self.activation_function(hidden_inputs)
+        ### Forward pass ###
+        # TODO: Hidden layer - Replace these values with your calculations.
+        hidden_inputs = None # signals into hidden layer
+        hidden_outputs = None # signals from hidden layer
 
         # TODO: Output layer - Replace these values with your calculations.
-        final_inputs = self.weights_hidden_to_output * hidden_outputs
-        final_outputs = final_inputs.sum(axis=0)
-
+        final_inputs = None # signals into final output layer
+        final_outputs = None # signals from final output layer
+        
         return final_outputs, hidden_outputs
 
     def backpropagation(self, final_outputs, hidden_outputs, X, y, delta_weights_i_h, delta_weights_h_o):
@@ -115,16 +127,16 @@ class NeuralNetwork(object):
         '''
         
         #### Implement the forward pass here ####
-
-        # TODO: Hidden layer - Replace these values with your calculations.
-        hidden_inputs  = self.weights_input_to_hidden * features.transpose()
-        hidden_inputs = hidden_inputs.sum(axis=0).reshape((hidden_inputs.shape[1],1))
-        hidden_outputs = self.activation_function(hidden_inputs)
-
-        # TODO: Output layer - Replace these values with your calculations.
-        final_inputs = self.weights_hidden_to_output * hidden_outputs
-        final_outputs = final_inputs.sum(axis=0)
+        # TODO: Hidden layer - replace these values with the appropriate calculations.
+        hidden_inputs = None # signals into hidden layer
+        hidden_outputs = None # signals from hidden layer
+        
+        # TODO: Output layer - Replace these values with the appropriate calculations.
+        final_inputs = None # signals into final output layer
+        final_outputs = None # signals from final output layer 
+        
         return final_outputs
+
 
 #########################################################
 # Set your hyperparameters here
