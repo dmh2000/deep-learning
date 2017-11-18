@@ -116,6 +116,9 @@ class NeuralNetwork(object):
         
         #### Implement the forward pass here ####
 
+        for f in features:
+            print(f)
+
         # TODO: Hidden layer - Replace these values with your calculations.
         hidden_inputs  = self.weights_input_to_hidden * features.transpose()
         hidden_inputs = hidden_inputs.sum(axis=0).reshape((hidden_inputs.shape[1],1))
