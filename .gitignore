@@ -7,7 +7,9 @@ face_generation/data/
 
 .ipynb_checkpoints/
 
-
+*.pickle
+*.zip
+*.gz
 *.pyc
 *.p
 *.pkl 
