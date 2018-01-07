@@ -2,16 +2,17 @@
 DON'T MODIFY ANYTHING IN THIS CELL
 """
 import helper
-import numpy as np
-import problem_unittests as tests
-from collections import Counter
 
 data_dir = './data/simpsons/moes_tavern_lines.txt'
 text = helper.load_data(data_dir)
 # Ignore notice, since we don't use it for analysing the data
 text = text[81:]
-
+# =====================================================================================
+# =====================================================================================
 view_sentence_range = (0, 10)
+
+# =====================================================================================
+# =====================================================================================
 
 """
 DON'T MODIFY ANYTHING IN THIS CELL
@@ -34,15 +35,22 @@ print()
 print('The sentences {} to {}:'.format(*view_sentence_range))
 print('\n'.join(text.split('\n')[view_sentence_range[0]:view_sentence_range[1]]))
 
+# =====================================================================================
+# =====================================================================================
 
-def create_lookup_tables(words):
+import numpy as np
+import problem_unittests as tests
+from collections import Counter
+
+
+def create_lookup_tables(text):
     """
     Create lookup tables for vocabulary
     :param words: Input list of words
     :return: A tuple of dicts.  The first dict....
     """
     # create dictionary with word:count
-    word_counts = Counter(words)
+    word_counts = Counter(text)
     # sort word_counts
     # sorted is the general sorting routine for dictionaries and other iterables
     # .get returns the value of each entry of an iterated object
@@ -67,6 +75,8 @@ DON'T MODIFY ANYTHING IN THIS CELL THAT IS BELOW THIS LINE
 tests.test_create_lookup_tables(create_lookup_tables)
 
 
+# =====================================================================================
+# =====================================================================================
 def token_lookup():
     """
     Generate a dict to turn punctuation into a token.
@@ -92,12 +102,48 @@ def token_lookup():
 DON'T MODIFY ANYTHING IN THIS CELL THAT IS BELOW THIS LINE
 """
 tests.test_tokenize(token_lookup)
+# =====================================================================================
+# =====================================================================================
+
 
 """
 DON'T MODIFY ANYTHING IN THIS CELL
 """
 # Preprocess Training, Validation, and Testing Data
 helper.preprocess_and_save_data(data_dir, token_lookup, create_lookup_tables)
+# =====================================================================================
+# =====================================================================================
+
+"""
+DON'T MODIFY ANYTHING IN THIS CELL
+"""
+import helper
+import numpy as np
+import problem_unittests as tests
+
+int_text, vocab_to_int, int_to_vocab, token_dict = helper.load_preprocess()
+# =====================================================================================
+# =====================================================================================
+
+"""
+DON'T MODIFY ANYTHING IN THIS CELL
+"""
+from distutils.version import LooseVersion
+import warnings
+import tensorflow as tf
+
+# Check TensorFlow Version
+assert LooseVersion(tf.__version__) >= LooseVersion('1.0'), 'Please use TensorFlow version 1.0 or newer'
+print('TensorFlow Version: {}'.format(tf.__version__))
+
+# Check for a GPU
+if not tf.test.gpu_device_name():
+    warnings.warn('No GPU found. Please use a GPU to train your neural network.')
+else:
+    print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
+# =====================================================================================
+# =====================================================================================
+
 
 """
 DON'T MODIFY ANYTHING IN THIS CELL
@@ -115,7 +161,7 @@ def get_inputs():
     Create TF Placeholders for input, targets, and learning rate.
     :return: Tuple (input, targets, learning rate)
     """
-    # TODO: Implement Function
+    # create the required placeholders
     inputs = tf.placeholder(tf.int32, [None, None], name="input")
     targets = tf.placeholder(tf.int32, [None, None], name="targets")
     rate = tf.placeholder(tf.float32, None, name="learning_rate")
@@ -128,6 +174,9 @@ DON'T MODIFY ANYTHING IN THIS CELL THAT IS BELOW THIS LINE
 tests.test_get_inputs(get_inputs)
 
 
+# =====================================================================================
+# =====================================================================================
+
 def get_init_cell(batch_size, rnn_size):
     """
     Create an RNN Cell and initialize it.
@@ -138,16 +187,17 @@ def get_init_cell(batch_size, rnn_size):
     # Basic LSTM cell
 
     # number of layers
-    rnn_layers = 2
+    rnn_layers = 1
 
-    lstm = tf.contrib.rnn.BasicLSTMCell(rnn_size)
-
-    # Add dropout to the cell
-    keep_prob = 1.0  # no dropout to start with
-    drop = tf.contrib.rnn.DropoutWrapper(lstm, output_keep_prob=keep_prob)
+    def build_cell(rnn_size):
+        lstm = tf.contrib.rnn.BasicLSTMCell(rnn_size)
+        # Add dropout to the cell
+        # keep_prob = 0.8  # dropout rate
+        # lstm = tf.contrib.rnn.DropoutWrapper(lstm, output_keep_prob=keep_prob)
+        return lstm
 
     # Stack up multiple LSTM layers, for deep learning
-    cell = tf.contrib.rnn.MultiRNNCell([drop] * rnn_layers)
+    cell = tf.contrib.rnn.MultiRNNCell([build_cell(rnn_size) for i in range(rnn_layers)])
 
     # Getting an initial state of all zeros
     initial_state = cell.zero_state(batch_size, tf.float32)
@@ -163,6 +213,9 @@ DON'T MODIFY ANYTHING IN THIS CELL THAT IS BELOW THIS LINE
 """
 tests.test_get_init_cell(get_init_cell)
 
+
+# =====================================================================================
+# =====================================================================================
 
 def get_embed(input_data, vocab_size, embed_dim):
     """
@@ -184,6 +237,9 @@ DON'T MODIFY ANYTHING IN THIS CELL THAT IS BELOW THIS LINE
 tests.test_get_embed(get_embed)
 
 
+# =====================================================================================
+# =====================================================================================
+
 def build_rnn(cell, inputs):
     """
     Create a RNN using a RNN Cell
@@ -194,7 +250,6 @@ def build_rnn(cell, inputs):
     # TODO: Implement Function
     outputs, final_state = tf.nn.dynamic_rnn(cell, inputs, dtype=tf.float32)
     final_state = tf.identity(final_state, "final_state")
-    print("build-rnn " + str(final_state.get_shape()))
     return outputs, final_state
 
 
@@ -203,6 +258,9 @@ DON'T MODIFY ANYTHING IN THIS CELL THAT IS BELOW THIS LINE
 """
 tests.test_build_rnn(build_rnn)
 
+
+# =====================================================================================
+# =====================================================================================
 
 def build_nn(cell, rnn_size, input_data, vocab_size, embed_dim):
     """
@@ -217,27 +275,29 @@ def build_nn(cell, rnn_size, input_data, vocab_size, embed_dim):
 
     # logits
     embed = get_embed(input_data, vocab_size, embed_dim)
-    print(embed.get_shape())
 
     # final state
     rnn_outputs, final_state = build_rnn(cell, embed)
-    print(rnn_outputs.get_shape())
-    print(final_state.get_shape())
 
+    # output
+    # use default initializers, activation_fn None specifies linear activation
     logits = tf.contrib.layers.fully_connected(rnn_outputs, vocab_size, activation_fn=None)
-
-    print(logits.get_shape())
 
     return logits, final_state
 
 
-print("testing----")
 """
 DON'T MODIFY ANYTHING IN THIS CELL THAT IS BELOW THIS LINE
 """
 tests.test_build_nn(build_nn)
 
 
+# =====================================================================================
+# =====================================================================================
+
+# this is my original get_batches. Being primarily  a C programmer, I think in loops
+# I knew there would be a way to make it simpler and more efficient using slicing
+# but I could not get that to work. see below
 def get_batches(int_text, batch_size, seq_length):
     """
     Return batches of input and target
@@ -280,26 +340,50 @@ def get_batches(int_text, batch_size, seq_length):
 
     return batches
 
+# I found this implementation recommeded by a mentor in the forums. it
+# cleared up how simple it would be to use slices. I did check that
+# the result of my original implementation and this one produced
+# the same set of batches. I kept my original implementation for the test.
+def get_batches_from_forum(int_text, batch_size, seq_length):
+    """
+    Return batches of input and target
+    :param int_text: Text with the words replaced by their ids
+    :param batch_size: The size of batch
+    :param seq_length: The length of sequence
+    :return: Batches as a Numpy array
+    """
+    batches = len(int_text) // (batch_size * seq_length)
 
-x = 0
-print(np.array(range(x * 35, x * 35 + 5)))
-print(np.array(range(x * 35 + 1, x * 35 + 1 + 5)))
+    input_ = np.array(int_text[: (batches*batch_size*seq_length)])
+    target_ = np.array(int_text[1 : (batches*batch_size*seq_length)+1])
+    target_[-1] = input_[0]
+
+    input_ = input_.reshape(batch_size, -1)
+    target_ = target_.reshape(batch_size, -1)
+
+    input_ = np.split(input_, batches, -1)
+    target_ = np.split(target_, batches, -1)
+
+    return np.array(list(zip(input_, target_)))
 
 """
 DON'T MODIFY ANYTHING IN THIS CELL THAT IS BELOW THIS LINE
 """
 tests.test_get_batches(get_batches)
+# =====================================================================================
+# =====================================================================================
+
 
 # Number of Epochs
 num_epochs = 2
 # Batch Size
-batch_size = 128
+batch_size = 64
 # RNN Size
 rnn_size = 256
 # Embedding Dimension Size
-embed_dim = 256
+embed_dim = 300
 # Sequence Length
-seq_length = 10
+seq_length = 100
 # Learning Rate
 learning_rate = 0.001
 # Show stats for every n number of batches
@@ -309,6 +393,8 @@ show_every_n_batches = 100
 DON'T MODIFY ANYTHING IN THIS CELL THAT IS BELOW THIS LINE
 """
 save_dir = './save'
+# =====================================================================================
+# =====================================================================================
 
 """
 DON'T MODIFY ANYTHING IN THIS CELL
@@ -339,11 +425,13 @@ with train_graph.as_default():
     gradients = optimizer.compute_gradients(cost)
     capped_gradients = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gradients if grad is not None]
     train_op = optimizer.apply_gradients(capped_gradients)
+# =====================================================================================
+# =====================================================================================
 
 """
 DON'T MODIFY ANYTHING IN THIS CELL
 """
-batches = get_batches(int_text, batch_size, seq_length)
+batches  = get_batches(int_text, batch_size, seq_length)
 
 with tf.Session(graph=train_graph) as sess:
     sess.run(tf.global_variables_initializer())
@@ -371,12 +459,16 @@ with tf.Session(graph=train_graph) as sess:
     saver = tf.train.Saver()
     saver.save(sess, save_dir)
     print('Model Trained and Saved')
+# =====================================================================================
+# =====================================================================================
 
 """
 DON'T MODIFY ANYTHING IN THIS CELL
 """
 # Save parameters for checkpoint
 helper.save_params((seq_length, save_dir))
+# =====================================================================================
+# =====================================================================================
 
 """
 DON'T MODIFY ANYTHING IN THIS CELL
@@ -389,6 +481,9 @@ import problem_unittests as tests
 _, vocab_to_int, int_to_vocab, token_dict = helper.load_preprocess()
 seq_length, load_dir = helper.load_params()
 
+
+# =====================================================================================
+# =====================================================================================
 def get_tensors(loaded_graph):
     """
     Get input, initial state, final state, and probabilities tensor from <loaded_graph>
@@ -396,17 +491,21 @@ def get_tensors(loaded_graph):
     :return: Tuple (InputTensor, InitialStateTensor, FinalStateTensor, ProbsTensor)
     """
     # TODO: Implement Function
-    inp    = loaded_graph.get_tensor_by_name("input:0")
+    inp = loaded_graph.get_tensor_by_name("input:0")
     istate = loaded_graph.get_tensor_by_name("initial_state:0")
     fstate = loaded_graph.get_tensor_by_name("final_state:0")
-    probs  = loaded_graph.get_tensor_by_name("probs:0")
-    return inp,istate,fstate,probs
+    probs = loaded_graph.get_tensor_by_name("probs:0")
+    return inp, istate, fstate, probs
 
 
 """
 DON'T MODIFY ANYTHING IN THIS CELL THAT IS BELOW THIS LINE
 """
 tests.test_get_tensors(get_tensors)
+
+
+# =====================================================================================
+# =====================================================================================
 
 def pick_word(probabilities, int_to_vocab):
     """
@@ -416,8 +515,8 @@ def pick_word(probabilities, int_to_vocab):
     :return: String of the predicted word
     """
     # TODO: Implement Function
-    index = np.random.choice(len(int_to_vocab.values()), p=probabilities)
-    print(index)
+
+    index = np.random.choice(len(probabilities), p=probabilities)
     return int_to_vocab[index]
 
 
@@ -426,7 +525,10 @@ DON'T MODIFY ANYTHING IN THIS CELL THAT IS BELOW THIS LINE
 """
 tests.test_pick_word(pick_word)
 
-gen_length = 20
+# =====================================================================================
+# =====================================================================================
+
+gen_length = 200
 # homer_simpson, moe_szyslak, or Barney_Gumble
 prime_word = 'moe_szyslak'
 
@@ -470,3 +572,6 @@ with tf.Session(graph=loaded_graph) as sess:
     tv_script = tv_script.replace('( ', '(')
 
     print(tv_script)
+
+# =====================================================================================
+# =====================================================================================
