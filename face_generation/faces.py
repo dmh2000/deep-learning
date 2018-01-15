@@ -316,7 +316,7 @@ def train(epoch_count, batch_size, z_dim, learning_rate, beta1, get_batches, dat
 
     steps = 0
     print_every = 1
-    show_every = 100
+    show_every = 2
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         for epoch_i in range(epoch_count):
@@ -335,11 +335,20 @@ def train(epoch_count, batch_size, z_dim, learning_rate, beta1, get_batches, dat
                     train_loss_d = d_loss.eval({inputs_z: batch_z, inputs_real: batch_images})
                     train_loss_g = g_loss.eval({inputs_z: batch_z})
 
-                    print("Epoch {}/{}...".format(epoch_i+1, epochs),
+                    print("Epoch {}/{}...".format(epoch_i + 1, epochs),
                           "Discriminator Loss: {:.4f}...".format(train_loss_d),
                           "Generator Loss: {:.4f}".format(train_loss_g))
                     # Save losses to view after training
                     # losses.append((train_loss_d, train_loss_g))
+
+                if steps % show_every == 0:
+                    out_dim = inputs_z.get_shape()[1];
+                    if out_dim == 1:
+                        format = "L"
+                    else:
+                        format = "RGB"
+
+                    show_generator_output(sess, 10, inputs_z, out_dim, format)
 
 
 # =================================================
@@ -348,15 +357,36 @@ def train(epoch_count, batch_size, z_dim, learning_rate, beta1, get_batches, dat
 
 batch_size = 200
 z_dim = 1
-learning_rate = 0.01
-beta1 = 0.05
+learning_rate = 0.0002
+beta1 = 0.9
 
 """
 DON'T MODIFY ANYTHING IN THIS CELL THAT IS BELOW THIS LINE
 """
 epochs = 2
 
-mnist_dataset = helper.Dataset('mnist', glob(os.path.join(data_dir, 'mnist/*.jpg')))
+# mnist_dataset = helper.Dataset('mnist', glob(os.path.join(data_dir, 'mnist/*.jpg')))
+# with tf.Graph().as_default():
+#     train(epochs, batch_size, z_dim, learning_rate, beta1, mnist_dataset.get_batches,
+#           mnist_dataset.shape, mnist_dataset.image_mode)
+
+
+batch_size = 200
+z_dim = 3
+learning_rate = 0.0002
+beta1 = 0.9
+
+# =================================================
+# Train CELEB
+# =================================================
+
+
+"""
+DON'T MODIFY ANYTHING IN THIS CELL THAT IS BELOW THIS LINE
+"""
+epochs = 1
+
+celeba_dataset = helper.Dataset('celeba', glob(os.path.join(data_dir, 'img_align_celeba/*.jpg')))
 with tf.Graph().as_default():
-    train(epochs, batch_size, z_dim, learning_rate, beta1, mnist_dataset.get_batches,
-          mnist_dataset.shape, mnist_dataset.image_mode)
+    train(epochs, batch_size, z_dim, learning_rate, beta1, celeba_dataset.get_batches,
+          celeba_dataset.shape, celeba_dataset.image_mode)
