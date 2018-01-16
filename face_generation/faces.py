@@ -81,13 +81,11 @@ def model_inputs(image_width, image_height, image_channels, z_dim):
     :param z_dim: The dimension of Z
     :return: Tuple of (tensor of real input images, tensor of z data, learning rate)
     """
-    # TODO: Implement Function
     # first dim is batch size, second is data size
     inputs_real = tf.placeholder(tf.float32, [None, image_width, image_height, image_channels], name="input_real")
     inputs_z = tf.placeholder(tf.float32, [None, z_dim], name="input_z")
-    learning_rate = tf.placeholder(tf.float32)
+    learning_rate = tf.placeholder(tf.float32,None,name="learning_rate")
     return inputs_real, inputs_z, learning_rate
-
 
 """
 DON'T MODIFY ANYTHING IN THIS CELL THAT IS BELOW THIS LINE
@@ -99,7 +97,6 @@ tests.test_model_inputs(model_inputs)
 # Discriminator
 # =================================================
 
-
 def discriminator(images, reuse=False, alpha=0.2):
     """
     Create the discriminator network
@@ -110,21 +107,27 @@ def discriminator(images, reuse=False, alpha=0.2):
     """
     # TODO: Implement Function
     with tf.variable_scope('discriminator', reuse=reuse):
-        # Input layer is 32x32x3
+        # Input layer is 28x28x3
         x1 = tf.layers.conv2d(images, 64, 5, strides=2, padding="same")
         r1 = tf.maximum(alpha * x1, x1)
 
-        x2 = tf.layers.conv2d(x1, 128, 5, strides=2, padding="same")
+        x2 = tf.layers.conv2d(r1, 128, 5, strides=2, padding="same")
         b2 = tf.layers.batch_normalization(x2, training=True)
         r2 = tf.maximum(alpha * b2, b2)
 
-        x3 = tf.layers.conv2d(x2, 256, 5, strides=2, padding="same")
+        x3 = tf.layers.conv2d(r2, 256, 5, strides=2, padding="same")
         b3 = tf.layers.batch_normalization(x3, training=True)
         r3 = tf.maximum(alpha * b3, b3)
 
         flat = tf.reshape(r3, (-1, 4 * 4 * 256))
         logits = tf.layers.dense(flat, 1)
         out = tf.sigmoid(logits)
+
+        # print("x1:{}".format(x1.get_shape()),
+        #      "x2:{}".format(x2.get_shape()),
+        #      "x3:{}".format(x3.get_shape()),
+        #      "fl:{}".format(flat.get_shape()),
+        #     )
 
     return out, logits
 
@@ -148,8 +151,6 @@ def generator(z, out_channel_dim, is_train=True, alpha=0.2):
     :param alpha : leaky relu rate
     :return: The tensor output of the generator
     """
-    s = 32
-
     # set reuse condition
     if is_train:
         # don't reuse when training
@@ -160,25 +161,25 @@ def generator(z, out_channel_dim, is_train=True, alpha=0.2):
 
     with tf.variable_scope('generator', reuse=reuse):
         # First fully connected layer
-        x1 = tf.layers.dense(z, 7 * 7 * (32 * s))
+        # size is multipled by 7 * 7 to get image dimensions 28x28 instead of 32x32
+        x1 = tf.layers.dense(z, 7 * 7 * 512)
+
         # Reshape it to start the convolutional stack
-        x1 = tf.reshape(x1, (-1, 7, 7, (32 * s)))
-        x1 = tf.layers.batch_normalization(x1, training=is_train)
-        x1 = tf.maximum(alpha * x1, x1)
-        # 512
+        x1 = tf.reshape(x1, (-1, 7, 7, 512))
+        b1 = tf.layers.batch_normalization(x1, training=is_train)
+        r1 = tf.maximum(alpha * b1, b1)
 
-        x2 = tf.layers.conv2d_transpose(x1, (14 * s), 5, strides=2, padding='same')
-        x2 = tf.layers.batch_normalization(x2, training=is_train)
-        x2 = tf.maximum(alpha * x2, x2)
-        # 256
+        # strides is 1 here to keep sizes correct
+        x2 = tf.layers.conv2d_transpose(r1, 256, 5, strides=1, padding='same')
+        b2 = tf.layers.batch_normalization(x2, training=is_train)
+        r2 = tf.maximum(alpha * b2, b2)
 
-        x3 = tf.layers.conv2d_transpose(x2, (7 * s), 5, strides=2, padding='same')
-        x3 = tf.layers.batch_normalization(x3, training=is_train)
-        x3 = tf.maximum(alpha * x3, x3)
-        # 128
+        x3 = tf.layers.conv2d_transpose(r2, 128, 5, strides=2, padding='same')
+        b3 = tf.layers.batch_normalization(x3, training=is_train)
+        r3 = tf.maximum(alpha * b3, b3)
 
         # Output layer, 28x28x5
-        logits = tf.layers.conv2d_transpose(x3, out_channel_dim, 5, strides=1, padding='same')
+        logits = tf.layers.conv2d_transpose(r3, out_channel_dim, 5, strides=2, padding='same')
 
         out = tf.tanh(logits)
     return out
@@ -202,6 +203,8 @@ def model_loss(input_real, input_z, output_dim, alpha=0.2):
     :param out_channel_dim: The number of channels in the output image
     :return: A tuple of (discriminator loss, generator loss)
     """
+
+    # same as in DCGAN exercise
     g_model = generator(input_z, output_dim, alpha=alpha)
     d_model_real, d_logits_real = discriminator(input_real, alpha=alpha)
     d_model_fake, d_logits_fake = discriminator(g_model, reuse=True, alpha=alpha)
@@ -231,6 +234,8 @@ def model_opt(d_loss, g_loss, learning_rate, beta1):
     :param beta1: The exponential decay rate for the 1st moment in the optimizer
     :return: A tuple of (discriminator training operation, generator training operation)
     """
+
+    # same as in DCGAN exercise, plus some reformating
     # Get weights and bias to update
     t_vars = tf.trainable_variables()
     d_vars = [var for var in t_vars if var.name.startswith('discriminator')]
@@ -302,84 +307,77 @@ def train(epoch_count, batch_size, z_dim, learning_rate, beta1, get_batches, dat
     :param data_shape: Shape of the data
     :param data_image_mode: The image mode to use for images ("RGB" or "L")
     """
-    # TODO: Build Model
-    tf.reset_default_graph()
-
-    inputs_real, inputs_z, lr = model_inputs(data_shape[1], data_shape[2], data_shape[3], z_dim)
-
-    if not learning_rate:
-        learning_rate = lr
+     inputs_real, inputs_z, lrate = model_inputs(data_shape[1], data_shape[2], data_shape[3], z_dim)
 
     d_loss, g_loss = model_loss(inputs_real, inputs_z, data_shape[3])
 
     d_opt, g_opt = model_opt(d_loss, g_loss, learning_rate, beta1)
 
     steps = 0
-    print_every = 1
-    show_every = 2
+    print_every = 20
+    show_every = 200  # every 100 was too often
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         for epoch_i in range(epoch_count):
             for batch_images in get_batches(batch_size):
                 steps += 1
 
+                batch_images *= 2
+
                 # Sample random noise for G
                 batch_z = np.random.uniform(-1, 1, size=(batch_size, z_dim))
 
                 # Run optimizers
-                _ = sess.run(d_opt, feed_dict={inputs_real: batch_images, inputs_z: batch_z})
-                _ = sess.run(g_opt, feed_dict={inputs_z: batch_z, inputs_real: batch_images})
+                _ = sess.run(d_opt, feed_dict={inputs_real: batch_images, inputs_z: batch_z, lrate: learning_rate})
+                _ = sess.run(g_opt, feed_dict={inputs_real: batch_images, inputs_z: batch_z, lrate: learning_rate})
 
                 if steps % print_every == 0:
                     # At the end of each epoch, get the losses and print them out
                     train_loss_d = d_loss.eval({inputs_z: batch_z, inputs_real: batch_images})
                     train_loss_g = g_loss.eval({inputs_z: batch_z})
 
-                    print("Epoch {}/{}...".format(epoch_i + 1, epochs),
+                    print("Epoch {}/{}/{}...".format(epoch_i + 1, epochs, steps),
                           "Discriminator Loss: {:.4f}...".format(train_loss_d),
                           "Generator Loss: {:.4f}".format(train_loss_g))
-                    # Save losses to view after training
-                    # losses.append((train_loss_d, train_loss_g))
 
                 if steps % show_every == 0:
-                    out_dim = inputs_z.get_shape()[1];
-                    if out_dim == 1:
-                        format = "L"
+                    # determine image dimension (this way was more clear to me than grabbing a shape index)
+                    if data_image_mode == "L":
+                        output_channel_dim = 1
                     else:
-                        format = "RGB"
-
-                    show_generator_output(sess, 10, inputs_z, out_dim, format)
+                        output_channel_dim = 3
+                    print(inputs_z.get_shape(),output_channel_dim,data_image_mode)
+                    # show_generator_output(sess, 9, inputs_z, output_channel_dim, data_image_mode)
 
 
 # =================================================
 # Train MNIST
 # =================================================
 
-batch_size = 200
-z_dim = 1
-learning_rate = 0.0002
-beta1 = 0.9
+batch_size = 100
+z_dim = 100
+learning_rate = 0.002
+beta1 = 0.3
 
 """
 DON'T MODIFY ANYTHING IN THIS CELL THAT IS BELOW THIS LINE
 """
 epochs = 2
 
-# mnist_dataset = helper.Dataset('mnist', glob(os.path.join(data_dir, 'mnist/*.jpg')))
-# with tf.Graph().as_default():
-#     train(epochs, batch_size, z_dim, learning_rate, beta1, mnist_dataset.get_batches,
-#           mnist_dataset.shape, mnist_dataset.image_mode)
+mnist_dataset = helper.Dataset('mnist', glob(os.path.join(data_dir, 'mnist/*.jpg')))
+with tf.Graph().as_default():
+    train(epochs, batch_size, z_dim, learning_rate, beta1, mnist_dataset.get_batches,
+          mnist_dataset.shape, mnist_dataset.image_mode)
 
-
-batch_size = 200
-z_dim = 3
-learning_rate = 0.0002
-beta1 = 0.9
 
 # =================================================
 # Train CELEB
 # =================================================
 
+batch_size = 100
+z_dim = 100
+learning_rate = 0.002
+beta1 = 0.3
 
 """
 DON'T MODIFY ANYTHING IN THIS CELL THAT IS BELOW THIS LINE
